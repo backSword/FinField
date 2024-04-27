@@ -124,8 +124,8 @@ Poly polyProd(const Poly p, const Poly q) {
 Poly polyCopy(const Poly p) {
     Poly r;
     r.deg = p.deg;
-    r.coeff = malloc((p.deg+1)*sizeof(num));
-    for (int i = 0; i < p.deg; i ++)
+    r.coeff = malloc((r.deg+1)*sizeof(num));
+    for (int i = 0; i <= p.deg; i ++)
         r.coeff[i] = p.coeff[i];
     return r;
 }
@@ -175,7 +175,16 @@ bool polyDiv(const Poly d, const Poly p) {
     return b;
 }
 
-num eval(const Poly p, num x) {
+Poly polyFromArray(const num c[], int deg) {
+    Poly r;
+    r.deg = deg;
+    r.coeff = malloc((deg+1)*sizeof(num));
+    for (int i = 0; i <= deg; i++)
+        r.coeff[i] = c[i];
+    return r;
+}
+
+num polyEval(const Poly p, num x) {
     num y = p.coeff[p.deg];
     for (int i = p.deg - 1; i >= 0; i --)
         y = sum(p.coeff[i], prod(y, x));
@@ -188,22 +197,22 @@ typedef struct s_PolyLL {
     struct s_PolyLL* next;
 } PolyLL;
 
-
 bool polyIrrGloutonAux(const Poly p, PolyLL* irr) {
-    if (equal(eval(p, zero), zero))
+    if (equal(polyEval(p, zero), zero))
         return false;
     for (num x = one; !equal(x, zero); x = next(x)) 
-        if (equal(eval(p, x), zero))
+        if (equal(polyEval(p, x), zero))
             return false;
 
     if (p.deg <= 3)
         return true;
-    
-    polyPrint(p);printf("\n");
 
     while (irr != NULL) {
-        if (irr->val.deg < p.deg && polyDiv(irr->val, p))
-            return false;
+        if (irr->val.deg <= p.deg / 2) {
+            printf("  ");polyPrint(irr->val); printf("\n");
+            if (polyDiv(irr->val, p))
+                return false;
+        }
         irr = irr->next;
     }
 
@@ -211,6 +220,7 @@ bool polyIrrGloutonAux(const Poly p, PolyLL* irr) {
 }
 Poly polyIrrGlouton(int n) {
     PolyLL* irr = NULL;
+    PolyLL* irrEnd = NULL;
     Poly p;
     p.coeff = malloc((n+1)*sizeof(num));
 
@@ -221,8 +231,14 @@ Poly polyIrrGlouton(int n) {
         while (equal(p.coeff[i], one)) { // fait tous les polynomes unitaires de deg i
             polyPrint(p);
             if (polyIrrGloutonAux(p, irr)) {
-                PolyLL l = {.val = p, .next = irr};
-                irr = &l;
+                PolyLL* l = malloc(sizeof(PolyLL));
+                l->val = polyCopy(p);
+                l->next = NULL;
+                if (irrEnd == NULL)
+                    irr = l;
+                else
+                    irrEnd->next = l;
+                irrEnd = l;
                 printf(" irr found");
             }
             printf("\n");
@@ -246,20 +262,23 @@ Poly polyIrrGlouton(int n) {
             return p;
 
         int j = -1;
-        do { 
-            printf("yay\n");
+        do {
             j ++;
             p.coeff[j] = next(p.coeff[j]);
         } while (j < n && equal(p.coeff[j], zero));
     }
-    p.coeff[n] = zero;
 
+    while (irr != NULL) {
+        PolyLL* l = irr->next;
+        free(irr);
+        irr = l;
+    }
     printf("done\n");
     return p;
 }
 
 int main() {
-    Poly p = polyIrrGlouton(4);
+    Poly p = polyIrrGlouton(6);
     polyPrint(p);
     polyFree(p);
 
