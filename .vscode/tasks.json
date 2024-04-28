@@ -9,6 +9,7 @@
             "${workspaceFolder}/main.c",
             "-fdiagnostics-color=always",
             "-Wall",
+            "-Werror",
             "-o",
             "${workspaceFolder}/main.exe",
             "-lm"

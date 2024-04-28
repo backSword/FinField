@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <math.h>
+// #include "mathext.c"
 #define max(a, b) (a < b ? b : a)
 
 // !! deg (0) = 0
@@ -16,22 +17,34 @@ typedef Fp num;
 #define equal Fpequal
 #define sum Fpsum
 #define prod Fpprod
-#define div Fpdiv
 #define inv Fpinv
 #define minus Fpminus
-#define next Fpnext
+#define succ Fpsucc
 
 typedef struct s_Poly {
-    int deg;
-    int* coeff;
+    uint deg;
+    uint* coeff;
 } Poly;
 
 void polyFree(Poly P) {
     free(P.coeff);
 }
 
+bool polyEqual(const Poly P, const Poly Q) {
+    if (P.deg != Q.deg)
+        return false;
+    for (uint i = 0; i < P.deg; i ++)
+        if (!equal(P.coeff[i], Q.coeff[i]))
+            return false;
+    return true;
+}
+
+bool polyConst(Poly P, num x) {
+    return P.deg == 0 && equal(P.coeff[0], x);
+}
+
 void polyPrint(Poly P) {
-    for (int i = P.deg; i > 0; i --) {
+    for (uint i = P.deg; i > 0; i --) {
         if (!equal(P.coeff[i], zero)) {
             if (!equal(P.coeff[i], one))
                 printnum(P.coeff[i]);
@@ -45,70 +58,79 @@ void polyPrint(Poly P) {
     }
     if (!equal(P.coeff[0], zero)) 
         printnum(P.coeff[0]);
+    if (polyConst(P, zero))
+        printnum(0);
 }
 
-bool polyEqual(const Poly P, const Poly q) {
-    if (P.deg != q.deg)
-        return false;
-    for (int i = 0; i < P.deg; i ++)
-        if (!equal(P.coeff[i], q.coeff[i]))
-            return false;
-    return true;
+Poly polyXPower(uint n) {
+    Poly R;
+    R.deg = n;
+    R.coeff = malloc((n+1)*sizeof(num));
+    for (uint i = 0; i < n; i ++)
+        R.coeff[i] = zero;
+    R.coeff[n] = one;
+    return R;
 }
 
-num safeCoeff(const Poly P, int i) {
-    assert(i >= 0);
+num safeCoeff(const Poly P, uint i) {
     return i > P.deg? 0 : P.coeff[i];
 }
 
 Poly polyScale(const Poly P, num x) {
-    Poly r;
-    r.deg = P.deg;
-    r.coeff = malloc((r.deg+1)*sizeof(num));
-    for (int i = 0; i <= P.deg; i ++)
-        r.coeff[i] = prod(P.coeff[i], x);
-    return r;
+    Poly R;
+    R.deg = P.deg;
+    R.coeff = malloc((R.deg+1)*sizeof(num));
+    for (uint i = 0; i <= P.deg; i ++)
+        R.coeff[i] = prod(P.coeff[i], x);
+    return R;
 }
 
 // NB : fait plus de trvail car retire les potentiels 0 devant le polynome
-Poly polySum(const Poly P, const Poly q) {
-    Poly r;
-    int i = max(P.deg, q.deg) + 1;
+Poly polySum(const Poly P, const Poly Q) {
+    Poly R;
+    uint i = max(P.deg, Q.deg) + 1;
     num cr;
     do {
         i --;
-        cr = sum(safeCoeff(P, i), safeCoeff(q, i));
+        cr = sum(safeCoeff(P, i), safeCoeff(Q, i));
     } while (i != 0 && equal(cr, zero));
-    r.deg = i;
-    r.coeff = malloc((i+1)*sizeof(num));
-    while (i >= 0) { 
-        r.coeff[i] = sum(safeCoeff(P, i), safeCoeff(q, i)); 
+    R.deg = i;
+    R.coeff = malloc((i+1)*sizeof(num));
+    R.coeff[i] = cr;
+    i --;
+    while (i != -1) { 
+        R.coeff[i] = sum(safeCoeff(P, i), safeCoeff(Q, i)); 
         i --;
     }
-    return r;
+    return R;
 }
 
-Poly polySub(const Poly P, const Poly q) {
-    return polySum(P, polyScale(q, minus(one)));
+Poly polySub(const Poly P, const Poly Q) {
+    return polySum(P, polyScale(Q, minus(one)));
 }
 
-Poly polyProd(const Poly P, const Poly q) {
-    Poly r;
-    r.deg = P.deg + q.deg;
-    r.coeff = malloc((r.deg+1)*sizeof(num));
-    for (int i = 0; i <= P.deg; i++)
-        for (int j = 0; j <= q.deg; j++)
-            r.coeff[i + j] = sum(r.coeff[i + j], prod(P.coeff[i], q.coeff[j]));
-    return r;
+Poly polyProd(const Poly P, const Poly Q) {
+    Poly R;
+    R.deg = P.deg + Q.deg;
+    R.coeff = malloc((R.deg+1)*sizeof(num));
+    for (uint i = 0; i <= P.deg; i++)
+        for (uint j = 0; j <= Q.deg; j++)
+            R.coeff[i + j] = sum(R.coeff[i + j], prod(P.coeff[i], Q.coeff[j]));
+    return R;
+}
+
+Poly polyUnit(const Poly P) {
+    assert(!polyConst(P, zero));
+    return polyScale(P, inv(P.coeff[P.deg]));
 }
 
 Poly polyCopy(const Poly P) {
-    Poly r;
-    r.deg = P.deg;
-    r.coeff = malloc((r.deg+1)*sizeof(num));
-    for (int i = 0; i <= P.deg; i ++)
-        r.coeff[i] = P.coeff[i];
-    return r;
+    Poly R;
+    R.deg = P.deg;
+    R.coeff = malloc((R.deg+1)*sizeof(num));
+    for (uint i = 0; i <= P.deg; i ++)
+        R.coeff[i] = P.coeff[i];
+    return R;
 }
 
 // this algorithm modifies the polynomial for maximal speed
@@ -118,63 +140,96 @@ void polyDivX(Poly P) {
     P.coeff ++;
 }
 
-Poly polyShiftX(const Poly P, int n) {
-    Poly r;
-    r.deg = P.deg + n;
-    r.coeff = malloc((r.deg+1)*sizeof(num));
-    for (int i = 0; i < n; i++)
-        r.coeff[i] = 0;
-    for (int i = 0; i <= P.deg; i++)
-        r.coeff[i + n] = P.coeff[i];
-    return r;
+Poly polyShiftX(const Poly P, uint n) {
+    Poly R;
+    R.deg = P.deg + n;
+    R.coeff = malloc((R.deg+1)*sizeof(num));
+    for (uint i = 0; i < n; i++)
+        R.coeff[i] = 0;
+    for (uint i = 0; i <= P.deg; i++)
+        R.coeff[i + n] = P.coeff[i];
+    return R;
 }
 
-void polyEuclid(const Poly P, const Poly d, Poly* r, Poly* q) {
-    assert(d.deg != 0);
-    q->deg = P.deg / d.deg;
-    q->coeff = malloc((q->deg+1) * sizeof(num));
-    *r = polyCopy(P);
-    Poly s;
-    while (r->deg >= d.deg) {
-        num l = div(r->coeff[r->deg], d.coeff[d.deg]);
-        int deg = r->deg - d.deg;
-        s = polyShiftX(polyScale(d, l), deg);
-        *r = polySub(*r, s);
-        q->coeff[deg] = l;
+void polyEuclid(const Poly P, const Poly D, Poly* R, Poly* Q) {
+    if (D.deg == 0) {
+        assert(D.coeff[0] != 0);
+        R->deg = 0;
+        R->coeff = malloc(sizeof(num));
+        R->coeff[0] = zero;
+        *Q = polyScale(P, inv(D.coeff[0]));
+        return;
+    } 
+    *R = polyCopy(P);
+    if (P.deg < D.deg) {
+        Q->deg = 0;
+        Q->coeff = malloc(sizeof(num));
+        Q->coeff[0] = 0;
+        return;
     }
-    polyFree(s);
+    Q->deg = P.deg - D.deg;
+    Q->coeff = malloc((Q->deg+1) * sizeof(num));
+    Poly S;
+    while (R->deg >= D.deg) {
+        num l = prod(R->coeff[R->deg], inv(D.coeff[D.deg]));
+        uint deg = R->deg - D.deg;
+        S = polyShiftX(polyScale(D, l), deg);
+        *R = polySub(*R, S);
+        Q->coeff[deg] = l;
+    }
+    polyFree(S);
 }
 
-bool polyDiv(const Poly d, const Poly P) {
-    if (d.deg == 0)
+bool polyDiv(const Poly D, const Poly P) {
+    if (D.deg == 0)
         return true;
-    Poly r, q;
-    polyEuclid(P, d, &r, &q);
-    bool b = true;
-    for (int i = 0; i < r.deg; i ++)
-        if (!equal(r.coeff[i], zero))
-            b = false;
-    polyFree(r);
-    polyFree(q);
+    printf("start div\n");
+    Poly R, Q;
+    polyEuclid(P, D, &R, &Q);
+    bool b = polyConst(R, zero);
+    polyFree(R);
+    polyFree(Q);
+    printf("end div\n");
     return b;
 }
 
-Poly polyFromArray(const num c[], int deg) {
-    Poly r;
-    r.deg = deg;
-    r.coeff = malloc((deg+1)*sizeof(num));
-    for (int i = 0; i <= deg; i++)
-        r.coeff[i] = c[i];
-    return r;
+Poly polyGcd(const Poly A, const Poly B) {
+    printf("polyGcd : A = ");
+    polyPrint(A);
+    printf(", B = ");
+    polyPrint(B);
+    printf("\n");
+    if (A.deg < B.deg)
+        return polyGcd(B, A);
+    if (polyConst(B, zero))
+        return polyUnit(A);
+
+    Poly Q, R;
+    polyEuclid(A, B, &R, &Q);
+    polyFree(Q);
+    Poly G = polyGcd(B, R);
+    polyFree(R);
+    printf("polyGcdEnd : G = ");
+    polyPrint(G);
+    printf("\n");
+    return G;
+}
+
+Poly polyFromArray(const num c[], uint deg) {
+    Poly R;
+    R.deg = deg;
+    R.coeff = malloc((deg+1)*sizeof(num));
+    for (uint i = 0; i <= deg; i++)
+        R.coeff[i] = c[i];
+    return R;
 }
 
 num polyEval(const Poly P, num x) {
     num y = P.coeff[P.deg];
-    for (int i = P.deg - 1; i >= 0; i --)
+    for (uint i = P.deg - 1; i != -1; i --)
         y = sum(P.coeff[i], prod(y, x));
     return y;
 }
-
 
 typedef struct s_PolyLL {
     Poly val;
@@ -184,7 +239,7 @@ typedef struct s_PolyLL {
 bool polyIrrGloutonAux(const Poly P, PolyLL* irr) {
     if (equal(polyEval(P, zero), zero))
         return false;
-    for (num x = one; !equal(x, zero); x = next(x)) 
+    for (num x = one; !equal(x, zero); x = succ(x)) 
         if (equal(polyEval(P, x), zero))
             return false;
 
@@ -202,14 +257,14 @@ bool polyIrrGloutonAux(const Poly P, PolyLL* irr) {
 
     return true;
 }
-Poly polyIrrGlouton(int n) {
-    PolyLL* irr = NULL;
-    PolyLL* irrEnd = NULL;
+Poly polyIrrGlouton(uint n) {
+    PolyLL* irr = NULL,
+        * irrEnd = NULL;
     Poly P;
     P.coeff = malloc((n+1)*sizeof(num));
 
     printf("building irr list...\n");
-    for (int i = 2; i < n; i++) {
+    for (uint i = 2; i < n; i++) {
         P.deg = i;
         P.coeff[i] = one;
         while (equal(P.coeff[i], one)) { // fait tous les polynomes unitaires de deg i
@@ -227,10 +282,10 @@ Poly polyIrrGlouton(int n) {
             }
             printf("\n");
 
-            int j = -1;
+            uint j = -1;
             do { 
                 j ++;
-                P.coeff[j] = next(P.coeff[j]);
+                P.coeff[j] = succ(P.coeff[j]);
             } while (j < i && equal(P.coeff[j], zero));
         }
         P.coeff[i] = zero;
@@ -245,10 +300,10 @@ Poly polyIrrGlouton(int n) {
         if (polyIrrGloutonAux(P, irr)) 
             return P;
 
-        int j = -1;
+        uint j = -1;
         do {
             j ++;
-            P.coeff[j] = next(P.coeff[j]);
+            P.coeff[j] = succ(P.coeff[j]);
         } while (j < n && equal(P.coeff[j], zero));
     }
 
@@ -257,6 +312,61 @@ Poly polyIrrGlouton(int n) {
         free(irr);
         irr = l;
     }
+    printf("done\n");
+    return P;
+}
+
+bool polyIrrRabinAux(Poly P, uint D, uint q, uint s[]) {
+    Poly Q = polyXPower(uint_pow(q, D));
+    Q.coeff[1] = minus(one);
+
+    printf("+ ");
+    polyPrint(Q);
+    printf("\n");
+
+    if (!polyDiv(P, Q))
+        return false;
+
+    for (int i = 0; s[i] != 0; i ++) {
+        Q.deg = uint_pow(q, D / s[i]);
+        Q.coeff[Q.deg] = 1;
+        
+        printf("- ");
+        polyPrint(Q);
+        printf("\n");
+
+        if (!polyConst(polyGcd(P, Q), one))
+            return false;
+    }
+
+    polyFree(Q);
+    return true;
+}
+Poly polyIrrRabin(uint d, uint q) {
+    uint s[(int) (2*log(log(d)) + .5)];
+    primeFactorisation(d, s);
+    for (int i = 0; s[i] != 0; i ++) 
+        printf("%d, ", s[i]);
+    printf("\n");
+
+    Poly P;
+    P.deg = d;
+    P.coeff = malloc((d+1)*sizeof(num));
+    P.coeff[d] = one;
+
+    while (equal(P.coeff[d], one)) {
+        polyPrint(P);
+        printf("\n");
+        if (polyIrrRabinAux(P, d, q, s)) 
+            return P;
+
+        uint j = -1;
+        do {
+            j ++;
+            P.coeff[j] = succ(P.coeff[j]);
+        } while (j < d && equal(P.coeff[j], zero));
+    }
+
     printf("done\n");
     return P;
 }
