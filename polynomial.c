@@ -127,20 +127,19 @@ Poly polyUnit(const Poly P) {
 Poly polyCopy(const Poly P) {
     Poly R;
     R.deg = P.deg;
+    printf("copy deg %d\n", P.deg);
     R.coeff = malloc((R.deg+1)*sizeof(num));
     for (uint i = 0; i <= P.deg; i ++)
         R.coeff[i] = P.coeff[i];
     return R;
 }
 
-// this algorithm modifies the polynomial for maximal speed
-void polyDivX(Poly P) {
-    assert(P.deg > 0);
-    P.deg --;
-    P.coeff ++;
+void polyReplace(Poly* P, Poly Q) {
+    free(P->coeff);
+    *P = Q;
 }
 
-Poly polyShiftX(const Poly P, uint n) {
+void polyShiftX(Poly P, uint n) {
     Poly R;
     R.deg = P.deg + n;
     R.coeff = malloc((R.deg+1)*sizeof(num));
@@ -148,10 +147,12 @@ Poly polyShiftX(const Poly P, uint n) {
         R.coeff[i] = 0;
     for (uint i = 0; i <= P.deg; i++)
         R.coeff[i + n] = P.coeff[i];
-    return R;
+    polyFree(P);
+    P = R;
 }
 
 void polyEuclid(const Poly P, const Poly D, Poly* R, Poly* Q) {
+    printf("euclid\n");
     if (D.deg == 0) {
         assert(D.coeff[0] != 0);
         R->deg = 0;
@@ -160,21 +161,27 @@ void polyEuclid(const Poly P, const Poly D, Poly* R, Poly* Q) {
         *Q = polyScale(P, inv(D.coeff[0]));
         return;
     } 
+    polyPrint(P);
+    printf("euclid mid\n");
     *R = polyCopy(P);
     if (P.deg < D.deg) {
         Q->deg = 0;
+        printf("a\n");
         Q->coeff = malloc(sizeof(num));
         Q->coeff[0] = 0;
+        printf("b\n");
         return;
     }
+    printf("euclid later\n");
     Q->deg = P.deg - D.deg;
-    Q->coeff = malloc((Q->deg+1) * sizeof(num));
+    Q->coeff = malloc((Q->deg+1)*sizeof(num));
     Poly S;
     while (R->deg >= D.deg) {
         num l = prod(R->coeff[R->deg], inv(D.coeff[D.deg]));
         uint deg = R->deg - D.deg;
-        S = polyShiftX(polyScale(D, l), deg);
-        *R = polySub(*R, S);
+        polyReplace(&S, polyScale(D, l));
+        polyShiftX(S, deg);
+        polyReplace(R, polySub(*R, S));
         Q->coeff[deg] = l;
     }
     polyFree(S);
@@ -186,6 +193,8 @@ bool polyDiv(const Poly D, const Poly P) {
     printf("start div\n");
     Poly R, Q;
     polyEuclid(P, D, &R, &Q);
+    polyPrint(R);
+    printf("\n");
     bool b = polyConst(R, zero);
     polyFree(R);
     polyFree(Q);
@@ -218,6 +227,7 @@ Poly polyGcd(const Poly A, const Poly B) {
 Poly polyFromArray(const num c[], uint deg) {
     Poly R;
     R.deg = deg;
+    printf("%ld\n", (deg+1)*sizeof(num));
     R.coeff = malloc((deg+1)*sizeof(num));
     for (uint i = 0; i <= deg; i++)
         R.coeff[i] = c[i];
@@ -320,7 +330,7 @@ bool polyIrrRabinAux(Poly P, uint D, uint q, uint s[]) {
     Poly Q = polyXPower(uint_pow(q, D));
     Q.coeff[1] = minus(one);
 
-    printf("+ ");
+    printf("> ");
     polyPrint(Q);
     printf("\n");
 
@@ -331,7 +341,7 @@ bool polyIrrRabinAux(Poly P, uint D, uint q, uint s[]) {
         Q.deg = uint_pow(q, D / s[i]);
         Q.coeff[Q.deg] = 1;
         
-        printf("- ");
+        printf("< ");
         polyPrint(Q);
         printf("\n");
 
