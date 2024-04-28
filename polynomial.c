@@ -260,11 +260,3 @@ Poly polyIrrGlouton(int n) {
     printf("done\n");
     return P;
 }
-
-int main() {
-    Poly P = polyIrrGlouton(5);
-    polyPrint(P);
-    polyFree(P);
-
-    return 0;
-}

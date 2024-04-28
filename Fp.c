@@ -25,29 +25,29 @@ int inversemodp(int A, int P) {
     return x % P;
 }
 
-void Fpprint(x) {
+void Fpprint(int x) {
     printf("%d", x);
 }
 Fp Fpzero = 0;
 Fp Fpone = 1;
-bool Fpequal(x, y) {
+bool Fpequal(int x, int y) {
     return x == y;
 }
-Fp Fpsum(x, y) {
+Fp Fpsum(int x, int y) {
     return (x + y) % p;
 }
-Fp Fpprod(x, y) {
+Fp Fpprod(int x, int y) {
     return (x * y) % p;
 }
-Fp Fpdiv(x, y) {
+Fp Fpdiv(int x, int y) {
     return Fpprod(x, inversemodp(y, p));
 }
-Fp Fpinv(x) {
+Fp Fpinv(int x) {
     return inversemodp(x, p);
 }
-Fp Fpminus(x) {
+Fp Fpminus(int x) {
     return p - x;
 }
-Fp Fpnext(x) {
+Fp Fpnext(int x) {
     return (x + 1) % p;
 }
